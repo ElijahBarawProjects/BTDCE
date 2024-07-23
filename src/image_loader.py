@@ -1,10 +1,11 @@
-import PIL
-from pathlib import Path
-
-import PIL.Image
-import numpy as np
+import cProfile
+import pstats
 import sys
 import warnings
+from pathlib import Path
+from PIL import Image, UnidentifiedImageError
+
+import numpy as np
 
 
 class SplitImages:
@@ -23,7 +24,7 @@ class SplitImages:
         self.bgLoc = backgroundLoc
 
         # will be set by readImg()
-        self.image: PIL.Image.Image = None
+        self.image: Image.Image = None
         self.isTransparent = self.pixels = None
 
         # will be set by getShapes()
@@ -32,7 +33,7 @@ class SplitImages:
     def readImg(self):
         try:
             # read image
-            self.image = PIL.Image.open(self.absPath)
+            self.image = Image.open(self.absPath)
 
             # get pixels as np array
             self.pixels = np.array(self.image)
@@ -48,7 +49,7 @@ class SplitImages:
             if self.bgLoc is not None:
                 # pixel is transparent if it matches the pixel at bgLoc
                 row, col = self.bgLoc
-                self.bgColor = self.getPixel(row, col)
+                self.bgColor = self.__getPixel(row, col)
                 return
 
             if self.isTransparent:
@@ -60,7 +61,7 @@ class SplitImages:
         except (
             FileNotFoundError,
             ValueError,
-            PIL.UnidentifiedImageError,
+            UnidentifiedImageError,
             TypeError,
         ) as e:
             raise e
@@ -71,12 +72,15 @@ class SplitImages:
                 "can't check transparency of non-transparent img without knowing bg color"
             )
 
+        return self.__pixelIsTransparent(pixel)
+
+    def __pixelIsTransparent(self, pixel):
         if self.bgColor is not None and np.array_equal(self.bgColor, pixel):
             return True
 
         if self.isTransparent:
             try:
-                return pixel[3] == 0
+                return bool(pixel[3] == 0)
             except (IndexError, ValueError) as e:
                 print("No alpha channel")
                 raise e
@@ -87,28 +91,23 @@ class SplitImages:
         return (
             self.image is not None
             and self.pixels is not None
-            and isinstance(self.image, PIL.Image.Image)
+            and isinstance(self.image, Image.Image)
         )
 
     def transpCheck(self):
         return self.bgColor is not None or self.isTransparent is True
 
     def getPixel(self, row: int, col: int):
-        if not self.hasImg:
+        if not self.hasImg():
             raise ValueError(
                 "Can't get pixel without image & img data",
                 self.image,
                 self.pixels,
             )
+        return self.__getPixel(row, col)
 
-        width = self.image.width
-        height = self.image.height
-
-        if not (0 <= row < height and 0 <= col < width):
-            raise IndexError(
-                f"Can't get pixel at row {row}, col {col} from image with width {width} and height {height}"
-            )
-
+    def __getPixel(self, row: int, col: int):
+        # if out of bounds, numpy will let us know
         return self.pixels[row, col]
 
     def __check(self):
@@ -133,20 +132,72 @@ class SplitImages:
                     continue
 
                 # don't try to make a shape from a transparent pixel
-                if self.pixelIsTransparent(self.getPixel(row, col)):
+                if self.__pixelIsTransparent(self.__getPixel(row, col)):
                     seen.add(loc)
                     continue
 
                 # find connected pixels
                 newShape = []
-                self.getConnectedPixels(seen, row, col, newShape, corners)
+                self.__getConnectedPixelsBFS(seen, row, col, newShape, corners)
 
                 # pixels returned by getConnectedPixels have been added to seen
                 self.shapes.append(newShape)
 
         sys.setrecursionlimit(oldRecLimit)
 
-    def getConnectedPixels(
+    def __getConnectedPixelsBFS(
+        self,
+        seen: set[tuple[int, int]],
+        startRow: int,
+        startCol: int,
+        shape: list[tuple[int, int]],
+        corners=True,
+    ):
+
+        loc = (startRow, startCol)
+        if loc in seen:
+            return
+
+        # can't add transparent pixels to shape
+        assert not self.__pixelIsTransparent(
+            self.__getPixel(startRow, startCol)
+        )
+
+        dirs = (
+            SplitImages.DIRS_WITH_CORNERS
+            if corners
+            else SplitImages.DIRS_NO_CORNERS
+        )
+
+        frontier = set()  # locations whose nbors we visit next
+        frontier.add(loc)  # visit a pixel when putting it in the frontier
+        shape.append(loc)
+        seen.add(loc)
+
+        while len(frontier) > 0:
+            nextFrontier = set()
+            for row, col in frontier:
+                for rowOff, colOff in dirs:
+                    newLoc = newRow, newCol = row + rowOff, col + colOff
+                    if newLoc in seen:
+                        continue
+
+                    try:
+                        pixel = self.__getPixel(newRow, newCol)
+                    except IndexError:
+                        continue
+
+                    if self.__pixelIsTransparent(pixel):
+                        seen.add(newLoc)
+                        continue
+
+                    # nbor hasn't been seen and is not transparent; visit it
+                    nextFrontier.add(newLoc)
+                    shape.append(newLoc)
+                    seen.add(newLoc)
+            frontier = nextFrontier
+
+    def __getConnectedPixelsDFS(
         self,
         seen: set[tuple[int, int]],
         startRow: int,
@@ -165,7 +216,9 @@ class SplitImages:
             return
 
         # can't add transparent pixels to shape
-        assert not self.pixelIsTransparent(self.getPixel(startRow, startCol))
+        assert not self.__pixelIsTransparent(
+            self.__getPixel(startRow, startCol)
+        )
 
         dirs = (
             SplitImages.DIRS_WITH_CORNERS
@@ -184,21 +237,21 @@ class SplitImages:
                 continue
 
             try:
-                pixel = self.getPixel(newRow, newCol)
+                pixel = self.__getPixel(newRow, newCol)
             except IndexError:
                 continue
 
-            if self.pixelIsTransparent(pixel):
+            if self.__pixelIsTransparent(pixel):
                 # visit pixel here, since it won't be visited in recursive call
                 seen.add(newLoc)
                 continue
 
             # continue the shape; also adds newLoc to shape and seen
-            self.getConnectedPixels(seen, newRow, newCol, shape, corners)
+            self.__getConnectedPixelsDFS(seen, newRow, newCol, shape, corners)
 
         return
 
-    def saveShapes(self, backgroundColor=None):
+    def saveShapes(self, outputDir: Path, backgroundColor=None):
         """
         For each shape in `self.shapes`, save a RGB PNG of that shape
 
@@ -210,7 +263,6 @@ class SplitImages:
         if backgroundColor is None:
             backgroundColor = self.bgColor[:3]  # R, G, B
 
-        outputDir = Path("..", "media", "shapes")
         outputDir.mkdir(exist_ok=True)
 
         width, height = self.image.width, self.image.height
@@ -228,7 +280,6 @@ class SplitImages:
             for row, col in shape:
                 maxRow = max(row, maxRow)
                 minRow = min(row, minRow)
-
                 maxCol = max(col, maxCol)
                 minCol = min(col, minCol)
 
@@ -243,7 +294,7 @@ class SplitImages:
                 continue
 
             # make a new RNG-PNG (no alpha) image, load shape data
-            newImage = PIL.Image.new(
+            newImage = Image.new(
                 "RGB", (shapeWidth, shapeHeight), color=tuple(backgroundColor)
             )
 
@@ -260,6 +311,10 @@ class SplitImages:
 
 
 def main():
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+
     path = Path("..", "media", "raw", "Derek_and_Harum1_Sprites.png")
     absolute_path = path.resolve()
     print("absolute path", absolute_path)
@@ -274,7 +329,27 @@ def main():
     splitImg.getShapes()
     print(len(splitImg.shapes))
 
-    splitImg.saveShapes()
+    splitImg.saveShapes(Path("..", "media", "Derek_and_Harum1_Sprites_shapes"))
+
+    profiler.disable()
+    stats = pstats.Stats(profiler)
+    stats.sort_stats("time").print_stats(10)  # print top 10 functions by time
+
+    # print("alt sprites")
+    # path = Path("..", "media", "raw", "Reddit_Sprites_WillyOnCrack.jpg")
+    # print("Initiating object")
+    # splitImg = SplitImages(path, backgroundLoc=(1, 1))
+
+    # print("Reading img")
+    # splitImg.readImg()
+
+    # print("Getting shapes")
+    # splitImg.getShapes()
+
+    # print("saving shapes")
+    # splitImg.saveShapes(
+    #     Path("..", "media", "Reddit_Sprites_WillyOnCrack_shapes")
+    # )
 
 
 if __name__ == "__main__":
