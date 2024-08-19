@@ -47,11 +47,13 @@ int main(void) {
     gfx_SetTransparentColor(1);
 
     gfx_SetDrawBuffer();
+
+    uint8_t position = 0;
     
     while (kb_Data[6] != kb_Clear) {
         drawMap();
         gfx_TransparentSprite(dart1, 0, 0);
-        gfx_TransparentSprite(base, 160, 120);
+        gfx_TransparentSprite(base, position++, 120);
         gfx_BlitBuffer();
     }
     
