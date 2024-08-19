@@ -45,9 +45,16 @@ int main(void) {
     gfx_Begin();
     gfx_SetPalette(global_palette, sizeof_global_palette, 0);
     gfx_SetTransparentColor(1);
-    drawMap();
-    gfx_TransparentSprite(dart1, 0, 0);
-    gfx_TransparentSprite(base, 160, 120);
+
+    gfx_SetDrawBuffer();
+    
+    while (kb_Data[6] != kb_Clear) {
+        drawMap();
+        gfx_TransparentSprite(dart1, 0, 0);
+        gfx_TransparentSprite(base, 160, 120);
+        gfx_BlitBuffer();
+    }
+    
     gfx_End();
     return 0;
 }

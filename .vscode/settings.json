@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "keypadc.h": "c",
+        "stdint.h": "c",
+        "stdbool.h": "c"
+    }
+}
