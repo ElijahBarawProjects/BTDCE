@@ -1,0 +1,19 @@
+palettes: c
+  - name: default_palette
+    images: automatic:
+
+converts:
+  - name: sprites
+    palette: default_palette
+    images:
+      - image1.png
+      - image2.png
+      - image3.png
+
+outputs:
+  - type: c
+    include-file: gfx.h
+    palettes:
+      - default_palette
+    converts:
+      - sprites

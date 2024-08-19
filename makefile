@@ -1,0 +1,20 @@
+# ----------------------------
+# Makefile Options
+# ----------------------------
+
+NAME = BTDCE
+ICON ?= icon.png
+DESCRIPTION = "Bloons TD 6 remake for the TI-84 Plus CE."
+COMPRESSED = YES
+ARCHIVED = YES
+
+CFLAGS ?= -Wall -Wextra -Oz
+CXXFLAGS ?= -Wall -Wextra -Oz
+
+# ----------------------------
+
+ifndef CEDEV
+$(error CEDEV environment path variable is not set)
+endif
+
+include $(CEDEV)/meta/makefile.mk

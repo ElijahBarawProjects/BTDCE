@@ -16,6 +16,22 @@
 // converted graphics files
 #include "gfx/gfx.h"
 
+void drawMap() {
+
+}
+
+void drawMonkeys() {
+
+}
+
+void drawBloons() {
+
+}
+
+void drawProjectiles() {
+
+} 
+
 void main(void) {
     
     
