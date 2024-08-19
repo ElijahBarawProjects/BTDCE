@@ -1,2 +1,4 @@
 media/shapes**
 __pycache__
+obj**
+bin**
