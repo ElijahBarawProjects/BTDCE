@@ -7,8 +7,11 @@ palettes:
       # background color (to remove)
       - color: {index: 1, r: 88, g: 94, b: 181}
       
-      # green
+      # green (for grass)
       - color: {index: 158, r: 158, g: 181, b: 86}
+
+      # grey (for path stone)
+      - color: {index: 159, r: 133, g: 133, b: 133}
       
       # white
       - color: {index: 255, r: 255, g: 255, b: 255}
