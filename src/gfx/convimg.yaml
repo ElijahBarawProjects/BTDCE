@@ -21,6 +21,7 @@ converts:
     images:
       - ../../media/shapes/Derek_and_Harum1_Sprites_shapes/towers/dart/*
       - ../../media/shapes/Derek_and_Harum1_Sprites_shapes/bloons/non-regrow/non-camo/red/*
+      - ../../media/shapes/Derek_and_Harum1_Sprites_shapes/misc/projectiles/big_dart.png
 
 
 outputs:
