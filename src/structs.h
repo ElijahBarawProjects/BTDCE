@@ -1,13 +1,15 @@
 #ifndef STRUCTS_H
 #define STRUCTS_H
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include <stdlib.h>
-
-
+#include <stdint.h>
+#include <graphx.h>
+#include <stdbool.h>
 
 /*
 Point on the canvas
@@ -43,6 +45,8 @@ typedef struct bloon_t {
    struct bloon_t *next;
    gfx_sprite_t *sprite;
    int speed;
+   uint16_t segment;    // index of the current path segment
+   uint16_t progress_along_segment; // how far along the current path segment the bloon is 
 } bloon_t;
 
 typedef struct  {
@@ -61,9 +65,11 @@ typedef struct {
 } projectile_t;
 
 typedef struct  {
+    int max_bloons;
     int num_bloons;
     int delay;
     int tick;
+    // dynamic sized array based on number of bloons in that round
     bloon_t *bloons;
 } round_t;
 
@@ -83,8 +89,6 @@ typedef struct {
     bool AUTOPLAY;
     bool SHOW_STATS;
 } game_t;
-
-
 
 #ifdef __cplusplus
 }
