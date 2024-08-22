@@ -1,15 +1,15 @@
 #ifndef STRUCTS_H
 #define STRUCTS_H
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdlib.h>
-#include <stdint.h>
 #include <graphx.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include "list.h"
 
 /*
 Point on the canvas
@@ -28,29 +28,28 @@ typedef struct {
     position_t upper_right;
     position_t lower_right;
 
-    enum {HORZ, VERT, DIAG} kind;
+    enum { HORZ, VERT, DIAG } kind;
 
 } rectangle_t;
 
 typedef struct {
-    position_t* points; // the points which make up the piecewise path
+    position_t* points;  // the points which make up the piecewise path
     rectangle_t* rectangles;
-    size_t num_points; // length of points
-    int length; // sum of lengths of line segments
-    int width; // width of the path
+    size_t num_points;  // length of points
+    int length;         // sum of lengths of line segments
+    int width;          // width of the path
 } path_t;
 
 typedef struct bloon_t {
-   position_t position;
-   struct bloon_t *next;
-   gfx_sprite_t *sprite;
-   int speed;
-   uint16_t segment;    // index of the current path segment
-   uint16_t progress_along_segment; // how far along the current path segment the bloon is 
+    position_t position;
+    gfx_sprite_t* sprite;
+    int speed;
+    uint16_t segment;                 // index of the current path segment
+    uint16_t progress_along_segment;  // how far along the current path segment
+                                      // the bloon is
 } bloon_t;
 
-typedef struct  {
-    struct tower_t *next;
+typedef struct {
     position_t position;
     int attack_speed;
     enum { FIRST, LAST, STRONG, CLOSE } target;
@@ -58,31 +57,30 @@ typedef struct  {
 } tower_t;
 
 typedef struct {
-    struct projectile_t *next;
     position_t position;
     int speed;
     int pierce;
 } projectile_t;
 
-typedef struct  {
+typedef struct {
     int max_bloons;
     int num_bloons;
     int delay;
     int tick;
-    // dynamic sized array based on number of bloons in that round
-    bloon_t *bloons;
+    bloon_t* bloons;  // array of bloons whose size is based on `max_bloons`
+
 } round_t;
 
 typedef struct {
     path_t* path;
     int hearts;
     int coins;
-    tower_t* towers;
-    bloon_t* bloons;
-    projectile_t* projectiles;
+    queue_t* towers;
+    queue_t* bloons;
+    queue_t* projectiles;
     round_t* rounds;
     bool exit;
-    enum {SELECTED, INFO, NONE} cursor_type;
+    enum { SELECTED, INFO, NONE } cursor_type;
     position_t cursor;
     int round;
 
