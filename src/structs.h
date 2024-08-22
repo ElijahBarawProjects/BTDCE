@@ -53,6 +53,10 @@ typedef struct  {
     struct tower_t *next;
     position_t position;
     int attack_speed;
+    int angle;
+    int tick;
+    int pop_count;
+    int pierce;
     enum { FIRST, LAST, STRONG, CLOSE } target;
     int radius;
 } tower_t;
@@ -60,8 +64,12 @@ typedef struct  {
 typedef struct {
     struct projectile_t *next;
     position_t position;
+    gfx_sprite_t *sprite;
     int speed;
+    int angle;
     int pierce;
+    // need the vector (speed + direction)
+    int direction;
 } projectile_t;
 
 typedef struct  {
