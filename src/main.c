@@ -30,9 +30,9 @@
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
 
-tower_t *initTower(game_t *game) {
+tower_t* initTower(game_t* game) {
     // in the future, add type of monkey being initialized
-    tower_t *tower = safe_malloc(sizeof(tower_t), __LINE__);
+    tower_t* tower = safe_malloc(sizeof(tower_t), __LINE__);
 
     tower->position = game->cursor;
     tower->attack_speed = 1;
@@ -41,8 +41,8 @@ tower_t *initTower(game_t *game) {
     return tower;
 }
 
-bloon_t *initBloon(game_t *game) {
-    bloon_t *bloon = safe_malloc(sizeof(bloon_t), __LINE__);
+bloon_t* initBloon(game_t* game) {
+    bloon_t* bloon = safe_malloc(sizeof(bloon_t), __LINE__);
 
     bloon->position.x = 0 - base->width;
     bloon->position.y = ((game->path)->points)[0].y;
@@ -51,7 +51,7 @@ bloon_t *initBloon(game_t *game) {
     return bloon;
 }
 
-void handleKeys(game_t *game) {
+void handleKeys(game_t* game) {
     kb_Scan();
 
     if (kb_Data[7] & kb_Up) {
@@ -78,8 +78,8 @@ void handleKeys(game_t *game) {
 
             // make a new tower & insert into game->towers
             // TODO: check the tower type
-            tower_t *tower = initTower(game);
-            queue_insert_head(game->towers, (void *)tower);
+            tower_t* tower = initTower(game);
+            queue_insert_head(game->towers, (void*)tower);
             game->cursor_type = NONE;
         }
     }
@@ -93,7 +93,7 @@ void handleKeys(game_t *game) {
     if (kb_Data[6] & kb_Clear) game->exit = true;
 }
 
-void drawCursor(game_t *game) {
+void drawCursor(game_t* game) {
     int x = game->cursor.x;
     int y = game->cursor.y;
     gfx_TransparentSprite(dart1, x, y);
@@ -103,33 +103,36 @@ void drawCursor(game_t *game) {
     gfx_Circle(x + (dart1->width / 2), y + (dart1->height / 2), 50);
 }
 
-void drawMap(game_t *game) {
+void drawMap(game_t* game) {
+    // draw the background
     gfx_SetColor(158);
-    // x, y, width, height
     gfx_FillRectangle(0, 0, 320, 240);
+
+    // draw the path
+    drawGamePath(game);
 }
 
-void drawStats(game_t *game) {
+void drawStats(game_t* game) {
     const size_t PADDING = 3;
-    size_t chars_drawn = 0;
+    // size_t chars_drawn = 0;
     size_t x_start = 10;
     size_t x_off = x_start;
     size_t y_off = 10;
     const size_t number_width = gfx_GetStringWidth("xxx");
 
-    const char *hearts_msg = "Hearts: ";
+    const char* hearts_msg = "Hearts: ";
     gfx_PrintStringXY(hearts_msg, x_off, y_off);
     x_off += gfx_GetStringWidth(hearts_msg);
     gfx_PrintInt(game->hearts, 1);
     x_off += number_width + PADDING;
 
-    const char *round_msg = "Round: ";
+    const char* round_msg = "Round: ";
     gfx_PrintStringXY(round_msg, x_off, y_off);
     x_off += gfx_GetStringWidth(round_msg);
     gfx_PrintInt(game->round, 1);
     x_off += number_width + PADDING;
 
-    const char *coinsMsg = "Coins: ";
+    const char* coinsMsg = "Coins: ";
     gfx_PrintStringXY(coinsMsg, x_off, y_off);
     x_off += gfx_GetStringWidth(coinsMsg);
     gfx_PrintInt(game->coins, 1);
@@ -140,7 +143,7 @@ void drawStats(game_t *game) {
     y_off += FONT_HEIGHT * 2;
     x_off = x_start;
 
-    const char *bloonsMSg = "Bloons: ";
+    const char* bloonsMSg = "Bloons: ";
     gfx_PrintStringXY(bloonsMSg, x_off, y_off * 3);
     x_off += gfx_GetStringWidth(bloonsMSg);
 
@@ -149,19 +152,19 @@ void drawStats(game_t *game) {
     gfx_PrintInt((int)num_bloons, 1);
 }
 
-void drawTowers(game_t *game) {
-    list_ele_t *curr_elem = game->towers->head;
+void drawTowers(game_t* game) {
+    list_ele_t* curr_elem = game->towers->head;
     while (curr_elem != NULL) {
-        tower_t *tower = (tower_t *)(curr_elem->value);
+        tower_t* tower = (tower_t*)(curr_elem->value);
         gfx_TransparentSprite(dart1, tower->position.x, tower->position.y);
         curr_elem = curr_elem->next;
     }
 }
 
-void drawBloons(game_t *game) {
-    list_ele_t *curr_elem = game->bloons->head;
+void drawBloons(game_t* game) {
+    list_ele_t* curr_elem = game->bloons->head;
     while (curr_elem != NULL) {
-        bloon_t *bloon = (bloon_t *)(curr_elem->value);
+        bloon_t* bloon = (bloon_t*)(curr_elem->value);
         gfx_TransparentSprite(base, bloon->position.x,
                               bloon->position.y - (base->height / 2));
 
@@ -169,9 +172,9 @@ void drawBloons(game_t *game) {
     }
 }
 
-void drawProjectiles(game_t *game) {}
+void drawProjectiles(game_t* game) {}
 
-void drawExitScreen(game_t *game) {
+void drawExitScreen(game_t* game) {
     // draw the amount of bloons that got through
     // count bloons
 
@@ -179,8 +182,8 @@ void drawExitScreen(game_t *game) {
 }
 
 const int NUM_ROUNDS = 50;
-round_t *initRounds(void) {
-    round_t *rounds = safe_malloc(sizeof(round_t) * NUM_ROUNDS, __LINE__);
+round_t* initRounds(void) {
+    round_t* rounds = safe_malloc(sizeof(round_t) * NUM_ROUNDS, __LINE__);
 
     size_t total_num_bloons = 0;
 
@@ -201,7 +204,7 @@ round_t *initRounds(void) {
             safe_malloc(sizeof(bloon_t) * rounds[i].max_bloons, __LINE__);
 
         if (rounds[i].bloons == NULL) {
-            dbg_printf("MALLOCED %lu BALOONS FUCK\n", total_num_bloons);
+            dbg_printf("MALLOCED %zu BALOONS FUCK\n", total_num_bloons);
         }
 
         total_num_bloons += rounds[i].max_bloons;
@@ -211,12 +214,12 @@ round_t *initRounds(void) {
         }
     }
 
-    dbg_printf("MALLOCED %lu BALOONS OK\n", total_num_bloons);
+    dbg_printf("MALLOCED %zu BALOONS OK\n", total_num_bloons);
 
     return rounds;
 }
 
-void freeRounds(round_t *rounds) {
+void freeRounds(round_t* rounds) {
     for (int i = 0; i < NUM_ROUNDS; i++) free(rounds[i].bloons);
     free(rounds);
 }
@@ -224,7 +227,7 @@ void freeRounds(round_t *rounds) {
 /// @brief updates `current_position` to move in the direction of `target`,
 /// until `max_dist` is reached or `target` is reached
 /// @return the distance left to move (0 if no movement left)
-double moveTowards(position_t *current_position, const position_t target,
+double moveTowards(position_t* current_position, const position_t target,
                    double max_dist) {
     // move vertically
     if (current_position->x == target.x) {
@@ -275,7 +278,7 @@ double moveTowards(position_t *current_position, const position_t target,
 
 /// @brief move bloon based on its current location and speed
 /// @return segment bloon is on after moving (equals bloon->segment)
-int moveBloon(game_t *game, bloon_t *bloon) {
+int moveBloon(game_t* game, bloon_t* bloon) {
     int numSegments = game->path->num_points - 1;
 
     double movement_left = (double)bloon->speed;
@@ -297,8 +300,8 @@ int moveBloon(game_t *game, bloon_t *bloon) {
     return bloon->segment;
 }
 
-game_t *newGame(position_t *points, size_t num_points) {
-    game_t *game = safe_malloc(sizeof(game_t), __LINE__);
+game_t* newGame(position_t* points, size_t num_points) {
+    game_t* game = safe_malloc(sizeof(game_t), __LINE__);
     game->path = newPath(points, num_points, DEFAULT_PATH_WIDTH);
     // choose hearts based on game difficulty, to be added
     game->hearts = 100;
@@ -327,16 +330,16 @@ game_t *newGame(position_t *points, size_t num_points) {
     return game;
 }
 
-void updateBloons(game_t *game) {
-    list_ele_t *curr_elem = game->bloons->head;
-    list_ele_t *tmp = NULL;
+void updateBloons(game_t* game) {
+    list_ele_t* curr_elem = game->bloons->head;
+    list_ele_t* tmp = NULL;
 
     const int BLOON_VALUE = 1;
     const int num_points = game->path->num_points;
     const int num_segments = num_points - 1;
 
     while (curr_elem != NULL) {
-        bloon_t *curr_bloon = (bloon_t *)(curr_elem->value);
+        bloon_t* curr_bloon = (bloon_t*)(curr_elem->value);
         int segBeforeMove = curr_bloon->segment;
         if (segBeforeMove >= num_segments ||             // off board now
             moveBloon(game, curr_bloon) >= num_segments  // off after moving
@@ -355,7 +358,7 @@ void updateBloons(game_t *game) {
     }
 }
 
-void handleGame(game_t *game) {
+void handleGame(game_t* game) {
     handleKeys(game);
 
     if (game->hearts <= 0) game->exit = true;
@@ -372,7 +375,6 @@ void handleGame(game_t *game) {
          0) &&
         game->rounds[game->round].num_bloons <
             game->rounds[game->round].max_bloons) {
-
         queue_insert_head(game->bloons, initBloon(game));
         game->rounds[game->round].num_bloons += 1;
     }
@@ -381,7 +383,7 @@ void handleGame(game_t *game) {
     updateBloons(game);
 }
 
-void exitGame(game_t *game) {
+void exitGame(game_t* game) {
     // free bloons, towers, projectiles
     queue_free(game->bloons, free);
     queue_free(game->towers, free);
@@ -389,21 +391,20 @@ void exitGame(game_t *game) {
 
     freePath(game->path);
     freeRounds(game->rounds);
-    
+
     // save any game elements before freeing
 
     free(game);
 }
 
 void runGame(void) {
-    game_t *game = newGame(NULL, 0);  // use default path
+    game_t* game = newGame(NULL, 0);  // use default path
 
     // ugly code for clarity
     while (game->exit == false) {
         handleGame(game);
 
         drawMap(game);
-        drawGamePath(game);
         drawStats(game);
         drawTowers(game);
         drawBloons(game);
