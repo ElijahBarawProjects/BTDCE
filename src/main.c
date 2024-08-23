@@ -22,6 +22,7 @@
 #include "gfx/gfx.h"
 
 // our code
+#include "list.h"
 #include "path.h"
 #include "structs.h"
 #include "utils.h"
@@ -30,47 +31,46 @@
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
 
-// in the future, add type of monkey being initialized
-tower_t *initTower(game_t *game) {
-    tower_t *tower = safe_malloc(sizeof(tower_t), __LINE__);
-    tower->attack_speed = 250;
+tower_t* initTower(game_t* game) {
+    // in the future, add type of monkey being initialized
+    tower_t* tower = safe_malloc(sizeof(tower_t), __LINE__);
+
+    tower->cooldown = 10;
     tower->position = game->cursor;
     tower->target = FIRST;
     tower->radius = 20;
     tower->pierce = 1;
-
     return tower;
 }
 
-bloon_t *initBloon(game_t *game) {
-    bloon_t *bloon = safe_malloc(sizeof(bloon_t), __LINE__);
+bloon_t* initBloon(game_t* game) {
+    bloon_t* bloon = safe_malloc(sizeof(bloon_t), __LINE__);
+
     bloon->position.x = 0 - base->width;
     bloon->position.y = ((game->path)->points)[0].y;
     bloon->speed = 3;
     bloon->segment = 0;
-
+    bloon->progress_along_segment = 0;
+    bloon->sprite = base;
     return bloon;
 }
 
-projectile_t *initProjectile(game_t *game, tower_t *tower) {
-    projectile_t *projectile = safe_malloc(sizeof(projectile_t), __LINE__);
-    // origin of the projectile (starting from tower)
-    int x = tower->position.x;
-    int y = tower->position.y;
+projectile_t* initProjectile(game_t* game, tower_t* tower) {
+    projectile_t* projectile = safe_malloc(sizeof(projectile_t), __LINE__);
 
-    projectile->position.x = x;
-    projectile->position.y = y;
+    // origin of the projectile (starting tower)
+    projectile->position.x = tower->position.x;
+    projectile->position.y = tower->position.y;
 
-    // case on the tower to determine the projectile speed
+    // TODO: case on tower to determine projectile details
     projectile->speed = 1;
     projectile->pierce = tower->pierce;
-    projectile->sprite = dart1;
+    projectile->sprite = big_dart;
     projectile->angle = 90;
-
     return projectile;
 }
 
-void handleKeys(game_t *game) {
+void handleKeys(game_t* game) {
     kb_Scan();
 
     if (kb_Data[7] & kb_Up) {
@@ -84,22 +84,21 @@ void handleKeys(game_t *game) {
     }
 
     if (kb_Data[6] & kb_Enter) {
-        if (game->cursor_type == SELECTED) {
-            // place the monkey
-            // check if the bounds are correct and this does not fall on the
-            // path base cost of the tower, replace
-            int base_cost = 100;
-            if (game->coins >= base_cost) game->coins -= base_cost;
+        int base_cost = 100;
 
-            tower_t *tower = initTower(game);
-            tower_t *tmp_tower = game->towers;
-            if (game->towers == NULL) {
-                game->towers = tower;
-                tower->next = tmp_tower;
-            } else {
-                game->towers = tower;
-                tower->next = tmp_tower;
-            }
+        if ((game->cursor_type == SELECTED) &&
+            (game->coins >= base_cost)) {  // player wants to place a tower &
+                                           // has sufficient funds
+
+            // charge the player
+            game->coins -= base_cost;
+
+            // TODO: check (in_bounds() && not_on_path())
+
+            // make a new tower & insert into game->towers
+            // TODO: check the tower type
+            tower_t* tower = initTower(game);
+            queue_insert_head(game->towers, (void*)tower);
             game->cursor_type = NONE;
         }
     }
@@ -123,15 +122,18 @@ void drawCursor(game_t *game) {
     gfx_Circle(x + (dart1->width / 2), y + (dart1->height / 2), 50);
 }
 
-void drawMap(game_t *game) {
+void drawMap(game_t* game) {
+    // draw the background
     gfx_SetColor(158);
-    // x, y, width, height
     gfx_FillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    // draw the path
+    drawGamePath(game);
 }
 
-void drawStats(game_t *game) {
+void drawStats(game_t* game) {
     const size_t PADDING = 3;
-    size_t chars_drawn = 0;
+    // size_t chars_drawn = 0;
     size_t x_start = 10;
     size_t x_off = x_start;
     size_t y_off = 10;
@@ -160,64 +162,56 @@ void drawStats(game_t *game) {
     y_off += FONT_HEIGHT * 2;
     x_off = x_start;
 
-    const char *bloonsMSg = "Bloons: ";
+    const char* bloonsMSg = "Bloons: ";
     gfx_PrintStringXY(bloonsMSg, x_off, y_off * 3);
     x_off += gfx_GetStringWidth(bloonsMSg);
 
-    size_t num_bloons = 0;
-    int len = 0;
-    bloon_t *tmp_bloon = game->bloons;
-    while (tmp_bloon != NULL) {
-        num_bloons++;
-        len++;
-        tmp_bloon = tmp_bloon->next;
-    }
-    dbg_printf("There are %lu bloons on screen\n", num_bloons);
-    gfx_PrintInt(len, 1);
+    size_t num_bloons = queue_size(game->bloons);
+    dbg_printf("There are %zu bloons on screen\n", num_bloons);
+    gfx_PrintInt((int)num_bloons, 1);
 }
 
-void drawTowers(game_t *game) {
-    tower_t *tmp_tower = game->towers;
-
-    while (tmp_tower != NULL) {
-        gfx_TransparentSprite(dart1, tmp_tower->position.x,
-                              tmp_tower->position.y);
-        tmp_tower = tmp_tower->next;
+void drawTowers(game_t* game) {
+    list_ele_t* curr_elem = game->towers->head;
+    while (curr_elem != NULL) {
+        tower_t* tower = (tower_t*)(curr_elem->value);
+        gfx_TransparentSprite(dart1, tower->position.x, tower->position.y);
+        curr_elem = curr_elem->next;
     }
 }
 
-void drawBloons(game_t *game) {
-    bloon_t *tmp_bloon = game->bloons;
+void drawBloons(game_t* game) {
+    list_ele_t* curr_elem = game->bloons->head;
+    while (curr_elem != NULL) {
+        bloon_t* bloon = (bloon_t*)(curr_elem->value);
+        gfx_TransparentSprite(base, bloon->position.x,
+                              bloon->position.y - (base->height / 2));
 
-    while (tmp_bloon != NULL) {
-        gfx_TransparentSprite(base, tmp_bloon->position.x,
-                              tmp_bloon->position.y - (base->height / 2));
-
-        tmp_bloon = tmp_bloon->next;
+        curr_elem = curr_elem->next;
     }
 }
 
-void drawProjectiles(game_t *game) {
-    bloon_t *tmp_projectile = game->projectiles;
-
-    while (tmp_projectile != NULL) {
-        gfx_TransparentSprite(base, tmp_projectile->position.x,
-                              tmp_projectile->position.y - (base->height / 2));
-
-        tmp_projectile = tmp_projectile->next;
+void drawProjectiles(game_t* game) {
+    list_ele_t* curr_elem = game->projectiles->head;
+    while (curr_elem != NULL) {
+        projectile_t* projectile = (projectile_t*)(curr_elem->value);
+        gfx_TransparentSprite(
+            projectile->sprite, projectile->position.x,
+            projectile->position.y - (projectile->sprite->height / 2));
+        curr_elem = curr_elem->next;
     }
 }
 
-void drawExitScreen(game_t *game) {
+void drawExitScreen(game_t* game) {
     // draw the amount of bloons that got through
     // count bloons
 
     // draw button
 }
 
-round_t *initRounds(void) {
-    const int NUM_ROUNDS = 50;
-    round_t *rounds = safe_malloc(sizeof(round_t) * NUM_ROUNDS, __LINE__);
+const int NUM_ROUNDS = 50;
+round_t* initRounds(void) {
+    round_t* rounds = safe_malloc(sizeof(round_t) * NUM_ROUNDS, __LINE__);
 
     size_t total_num_bloons = 0;
 
@@ -238,7 +232,7 @@ round_t *initRounds(void) {
             safe_malloc(sizeof(bloon_t) * rounds[i].max_bloons, __LINE__);
 
         if (rounds[i].bloons == NULL) {
-            dbg_printf("MALLOCED %lu BALOONS FUCK\n", total_num_bloons);
+            dbg_printf("MALLOCED %zu BALOONS FUCK\n", total_num_bloons);
         }
 
         total_num_bloons += rounds[i].max_bloons;
@@ -248,39 +242,103 @@ round_t *initRounds(void) {
         }
     }
 
-    dbg_printf("MALLOCED %lu BALOONS OK\n", total_num_bloons);
+    dbg_printf("MALLOCED %zu BALOONS OK\n", total_num_bloons);
 
     return rounds;
 }
 
-game_t *newGame(position_t *points, size_t num_points) {
-    /**
-     *  typedef struct  {
-        path_t* path;
-        int hearts;
-        int coins;
-        tower_t* towers;
-        bloon_t* bloons;
-        projectile_t* projectiles;
-        bool exit;
-        enum {SELECTED, INFO, NONE} cursor_type;
-        position_t cursor;
-        int round;
-        bool AUTOPLAY;
-        bool DEBUG;
-} game_t;
-     */
+void freeRounds(round_t* rounds) {
+    for (int i = 0; i < NUM_ROUNDS; i++) free(rounds[i].bloons);
+    free(rounds);
+}
 
-    game_t *game = safe_malloc(sizeof(game_t), __LINE__);
+/// @brief updates `current_position` to move in the direction of `target`,
+/// until `max_dist` is reached or `target` is reached
+/// @return the distance left to move (0 if no movement left)
+double moveTowards(position_t* current_position, const position_t target,
+                   double max_dist) {
+    // move vertically
+    if (current_position->x == target.x) {
+        int dy = target.y - current_position->y;
+        if (abs(dy) <= max_dist) {  // can move to target
+            current_position->y = target.y;
+            return max_dist - abs(dy);
+        }
+
+        // can move towards target but not reach it
+        current_position->y += (int)(dy < 0 ? -max_dist : max_dist);
+        return 0.0;
+    }
+
+    // move horizontally
+    if (current_position->y == target.y) {
+        int dx = target.x - current_position->x;
+        if (abs(dx) <= max_dist) {  // can move to target
+            current_position->x = target.x;
+            return max_dist - abs(dx);
+        }
+
+        // can move towards target but not reach it
+        current_position->x += (int)(dx < 0 ? -max_dist : max_dist);
+        return 0.0;
+    }
+
+    // move on a diagonal (slow)
+    // Calculate direction vector to next point
+    int dx = target.x - current_position->x;
+    int dy = target.y - current_position->y;
+    double dist = sqrt(dx * dx + dy * dy);  // distance to point
+
+    if (dist <= max_dist) {
+        // can reach the point
+        current_position->x = target.x;
+        current_position->y = target.y;
+        return max_dist - dist;
+    }
+
+    // can't quite reach the point
+
+    // Normalize the direction vector and move the bloon along it
+    current_position->x += (int)((max_dist / dist) * dx);
+    current_position->y += (int)((max_dist / dist) * dy);
+    return 0.0;
+}
+
+/// @brief move bloon based on its current location and speed
+/// @return segment bloon is on after moving (equals bloon->segment)
+int moveBloon(game_t* game, bloon_t* bloon) {
+    int numSegments = game->path->num_points - 1;
+
+    double movement_left = (double)bloon->speed;
+    while (movement_left > 0.0) {
+        int currSeg = bloon->segment;
+        if (currSeg >= numSegments) {
+            // on non-existent segment
+            return currSeg;
+        }
+
+        // move towards end-point of current segment
+        position_t target = (game->path->points)[currSeg + 1];
+        movement_left = moveTowards(&(bloon->position), target, movement_left);
+        if (bloon->position.x == target.x && bloon->position.y == target.y) {
+            bloon->segment++;
+        }
+    }
+
+    return bloon->segment;
+}
+
+game_t* newGame(position_t* points, size_t num_points) {
+    game_t* game = safe_malloc(sizeof(game_t), __LINE__);
     game->path = newPath(points, num_points, DEFAULT_PATH_WIDTH);
     // choose hearts based on game difficulty, to be added
     game->hearts = 100;
     game->coins = 500;
 
-    game->towers = NULL;
-    game->bloons = NULL;
+    game->towers = queue_new();
+    game->bloons = queue_new();
+    game->projectiles = queue_new();
 
-    game->projectiles = NULL;
     game->exit = false;
 
     position_t start_cursor = {160, 120};
@@ -300,157 +358,155 @@ game_t *newGame(position_t *points, size_t num_points) {
     return game;
 }
 
-void updateTowers(game_t *game) {
-    tower_t *tmp_tower = game->towers;
-    tower_t *prev_tower = NULL;
-
-    while (tmp_tower != NULL) {
-        // update tower ticks and send out projectile
-        tmp_tower->tick++;
-
-        if (tmp_tower->tick % tmp_tower->attack_speed == 0) {
-            projectile_t *new_projectile = initProjectile(game, tmp_tower);
-            projectile_t *tmp_projectile = game->projectiles;
-            // use tower to get the pierce of the projectile
-            game->projectiles = new_projectile;
-            new_projectile->next = tmp_projectile;
-
-            // reset attack counter
-            tmp_tower->tick = 0;
-        }
-
-        prev_tower = tmp_tower;
-        tmp_tower = tmp_tower->next;
-    }
+bool boxesCollide(position_t p1, int width1, int height1, position_t p2,
+                  int width2, int height2) {
+    return (p1.x < p2.x + width2 && p1.x + width1 > p2.x &&
+            p1.y < p2.y + height2 && p1.y + height1 > p2.y);
 }
 
-void updateProjectiles(game_t *game) {
-    projectile_t *tmp_projectile = game->projectiles;
-    projectile_t *prev_projectile = NULL;
-
-    while (tmp_projectile != NULL) {
-        // Find the vector to increase position by given angle and speed
-        // Default movement for now (moving left)
-        tmp_projectile->position.x--;
-
-        // DESPAWN IF:
-        // Check if the projectile has gone off-screen
-        if (tmp_projectile->position.x < 0 || 
-            tmp_projectile->position.y < 0 ||
-            tmp_projectile->position.x > SCREEN_WIDTH || 
-            tmp_projectile->position.y > SCREEN_HEIGHT) {
-                
-            // Remove the projectile from the linked list
-            if (prev_projectile != NULL) {
-                prev_projectile->next = tmp_projectile->next;
-            } else {
-                game->projectiles = tmp_projectile->next;
-            }
-
-            projectile_t *to_free = tmp_projectile;
-            tmp_projectile = tmp_projectile->next;
-            free(to_free);
-            continue;
-        }
-
-        prev_projectile = tmp_projectile;
-        tmp_projectile = tmp_projectile->next;
-    }
-}
-
-void updateBloons(game_t *game) {
-    bloon_t *tmp_bloon = game->bloons;
-    bloon_t *prev_bloon = NULL;
+void updateBloons(game_t* game) {
+    list_ele_t* next_bloon_elem = NULL;
+    list_ele_t* next_proj_elem = NULL;
 
     const int BLOON_VALUE = 1;
     const int num_points = game->path->num_points;
+    const int num_segments = num_points - 1;
 
-    while (tmp_bloon != NULL) {
-        int segment = tmp_bloon->segment;
+    // TODO: check for collissions with projectiles
+    list_ele_t* curr_elem = game->bloons->head;
+    while (curr_elem != NULL) {
+        next_bloon_elem = curr_elem->next;
 
-        if (segment < num_points - 1) {  // Ensure there's a next segment to target
-            int x_target = game->path->points[segment + 1].x;
-            int y_target = game->path->points[segment + 1].y;
-            int x = tmp_bloon->position.x;
-            int y = tmp_bloon->position.y;
-            int BLOON_WIDTH = tmp_bloon->sprite->width;
-            int BLOON_HEIGHT = tmp_bloon->sprite->height;
+        // loop over all projectiles
 
-            // Calculate direction vector to the next point
-            int dx = x_target - x;
-            int dy = y_target - y;
-            float distance = sqrt(dx * dx + dy * dy);
+        bloon_t* tmp_bloon = (bloon_t*)(curr_elem->value);
+        int bloon_width = tmp_bloon->sprite->width;
+        int bloon_height = tmp_bloon->sprite->height;
+        // int x = tmp_bloon->position.x;
+        // int y = tmp_bloon->position.y;
 
-            // Normalize the direction vector and move the bloon along it
-            if (distance != 0) {
-                tmp_bloon->position.x +=
-                    (int)(tmp_bloon->speed * dx / distance);
-                tmp_bloon->position.y +=
-                    (int)(tmp_bloon->speed * dy / distance);
+        list_ele_t* curr_proj_elem = game->projectiles->head;
+        while (curr_proj_elem != NULL) {
+            next_proj_elem = curr_proj_elem->next;
+
+            projectile_t* tmp_projectile = (projectile_t*)curr_proj_elem->value;
+
+            int width = tmp_projectile->sprite->width;
+            int height = tmp_projectile->sprite->height;
+
+            // check for collision (axis aligned bounding box)
+            if (boxesCollide(tmp_bloon->position, bloon_width, bloon_height,
+                             tmp_projectile->position, width, height)) {
+                // TODO: draw the explosion/pop
+                dbg_printf(
+                    "bloon width: %d; bloon height: %d; projectile width: %d; "
+                    "projectile height: %d\n",
+                    bloon_width, bloon_height, width, height);
+
+                // remove bloon
+                remove_and_delete(game->bloons, curr_elem, free);
+
+                // remove projectile
+                remove_and_delete(game->projectiles, curr_proj_elem, free);
+
+                break;  // can't pop same bloon twice.
             }
 
-            // Check for projectile collisions
-            projectile_t *tmp_projectile = game->projectiles;
-            while (tmp_projectile != NULL) {
-                int width = tmp_projectile->sprite->width;
-                int height = tmp_projectile->sprite->height;
+            // // Projectile's position
+            // int px = tmp_projectile->position.x;
+            // int py = tmp_projectile->position.y;
+            // // Check for collision (axis-aligned bounding box collision
+            // // detection)
+            // if (px < x + bloon_width &&  // Check if projectile's left edge
+            // is
+            //                              // to the left of bloon's right edge
+            //     px + width > x &&  // Check if projectile's right edge is to
+            //     the
+            //                        // right of bloon's left edge
+            //     py < y + bloon_height &&  // Check if projectile's top edge
+            //     is
+            //                               // above bloon's bottom edge
+            //     py + height > y) {  // Check if projectile's bottom edge is
+            //                         // below bloon's top edge
+            //     // draw the explosion/pop
 
-                // Projectile's position
-                int px = tmp_projectile->position.x;
-                int py = tmp_projectile->position.y;
+            //     // remove bloon
+            //     remove_and_delete(game->bloons, curr_elem, free);
 
-                // Check for collision (axis-aligned bounding box collision detection)
-                if (px < x + BLOON_WIDTH &&        // Check if projectile's left edge is to the left of bloon's right edge
-                    px + width > x &&              // Check if projectile's right edge is to the right of bloon's left edge
-                    py < y + BLOON_HEIGHT &&       // Check if projectile's top edge is above bloon's bottom edge
-                    py + height > y) {             // Check if projectile's bottom edge is below bloon's top edge
-                    // Handle the collision: draw the explosion/pop, remove the bloon, etc.
-                    // Remove the bloon from the list
-                    if (prev_bloon != NULL) {
-                        prev_bloon->next = tmp_bloon->next;
-                    } else {
-                        game->bloons = tmp_bloon->next;
-                    }
-                    bloon_t *to_free = tmp_bloon;
-                    tmp_bloon = tmp_bloon->next;
-                    free(to_free);
-                    goto next_bloon;  // Skip further processing for this bloon
-                }
+            //     // remove projectile
+            //     remove_and_delete(game->projectiles, curr_proj_elem, free);
+            // }
 
-                tmp_projectile = tmp_projectile->next;
-            }
-
-            // Check if bloon has reached (or passed) the target point
-            if (abs(tmp_bloon->position.x - x_target) <= tmp_bloon->speed &&
-                abs(tmp_bloon->position.y - y_target) <= tmp_bloon->speed) {
-                tmp_bloon->segment++;  // Move to the next segment
-
-                // If no more segments, the bloon reaches the end
-                if (tmp_bloon->segment >= num_points - 1) {
-                    game->hearts -= BLOON_VALUE;
-                    // Remove the bloon from the list
-                    if (prev_bloon != NULL) {
-                        prev_bloon->next = tmp_bloon->next;
-                    } else {
-                        game->bloons = tmp_bloon->next;
-                    }
-                    bloon_t *to_free = tmp_bloon;
-                    tmp_bloon = tmp_bloon->next;
-                    free(to_free);
-                    continue;
-                }
-            }
+            curr_proj_elem = next_proj_elem;
         }
 
-        prev_bloon = tmp_bloon;
-        tmp_bloon = tmp_bloon->next;
-    // remove this 
-    next_bloon:
-        continue;  // Continue to the next bloon in the list
+        curr_elem = next_bloon_elem;
+    }
+
+    curr_elem = game->bloons->head;
+    list_ele_t* tmp;
+    while (curr_elem != NULL) {
+        bloon_t* curr_bloon = (bloon_t*)(curr_elem->value);
+        int segBeforeMove = curr_bloon->segment;
+        if (segBeforeMove >= num_segments ||             // off board now
+            moveBloon(game, curr_bloon) >= num_segments  // off after moving
+        ) {
+            // delete bloon & count against health
+            game->hearts -= BLOON_VALUE;
+            tmp = curr_elem->next;
+
+            remove_and_delete(game->bloons, curr_elem,
+                              free);  // frees list_elem_t and bloon_t
+            curr_elem = tmp;
+            continue;
+        }
+
+        curr_elem = curr_elem->next;
     }
 }
 
-void handleGame(game_t *game) {
+void updateTowers(game_t* game) {
+    list_ele_t* curr_elem = game->towers->head;
+    while (curr_elem != NULL) {
+        tower_t* tower = (tower_t*)(curr_elem->value);
+        if ((++tower->tick) % tower->cooldown == 0) {
+            // tower can attack; it spawns a new projectile
+            queue_insert_head(game->projectiles, initProjectile(game, tower));
+        }
+        curr_elem = curr_elem->next;
+    }
+}
+
+bool offScreen(position_t p) {
+    return (p.x < 0 || p.y < 0 || p.x > SCREEN_WIDTH || p.y > SCREEN_HEIGHT);
+}
+
+void updateProjectiles(game_t* game) {
+    list_ele_t* curr_elem = game->projectiles->head;
+    list_ele_t* tmp;
+    while (curr_elem != NULL) {
+        projectile_t* proj = (projectile_t*)(curr_elem->value);
+        tmp = curr_elem->next;
+
+        // Find the vector to increase position by given angle and speed
+        // Default movement for now (moving left)
+        dbg_printf("1");
+        proj->position.x--;
+
+        // DESPAWN IF:
+        // check if projectile hsa gon off screen
+        dbg_printf("2");
+        if (offScreen(proj->position)) {
+            dbg_printf("3");
+            // Remove the projectile from the linked list & free it
+            remove_and_delete(game->projectiles, curr_elem, free);
+            dbg_printf("4");
+        }
+        curr_elem = tmp;
+    }
+}
+
+void handleGame(game_t* game) {
     handleKeys(game);
 
     if (game->hearts <= 0) game->exit = true;
@@ -460,20 +516,14 @@ void handleGame(game_t *game) {
         game->round++;
     }
 
-    if (game->round == 101) game->exit = true;
+    if (game->round == NUM_ROUNDS) game->exit = true;
 
     game->rounds[game->round].tick++;
     if ((game->rounds[game->round].tick % game->rounds[game->round].delay ==
          0) &&
         game->rounds[game->round].num_bloons <
             game->rounds[game->round].max_bloons) {
-        // initBloon
-        bloon_t *tmp_bloon = game->bloons;
-        bloon_t *new_bloon = initBloon(game);
-
-        game->bloons = new_bloon;
-        new_bloon->next = tmp_bloon;
-
+        queue_insert_head(game->bloons, initBloon(game));
         game->rounds[game->round].num_bloons += 1;
     }
 
@@ -482,48 +532,32 @@ void handleGame(game_t *game) {
     updateProjectiles(game);
     // move bloons, remove any that go off screen by reducing game health by 1
     updateBloons(game);
+    updateTowers(game);
+    updateProjectiles(game);
 }
 
-void exitGame(game_t *game) {
-    // loop through bloons, towers, projectiles array
-    bloon_t *tmp_bloon = game->bloons;
-    bloon_t *curr_bloon = NULL;
-    tower_t *tmp_tower = game->towers;
-    tower_t *curr_tower = NULL;
-    projectile_t *tmp_projectile = game->projectiles;
-    projectile_t *curr_projectile = game->projectiles;
+void exitGame(game_t* game) {
+    // free bloons, towers, projectiles
+    queue_free(game->bloons, free);
+    queue_free(game->towers, free);
+    queue_free(game->projectiles, free);
 
-    while (curr_bloon != NULL) {
-        tmp_bloon = curr_bloon->next;
-        free(curr_bloon);
-        curr_bloon = tmp_bloon;
-    }
-
-    while (curr_tower != NULL) {
-        tmp_tower = curr_tower->next;
-        free(curr_tower);
-        curr_tower = tmp_tower;
-    }
-
-    while (curr_projectile != NULL) {
-        tmp_projectile = curr_projectile->next;
-        free(curr_projectile);
-        curr_projectile = tmp_projectile;
-    }
+    freePath(game->path);
+    freeRounds(game->rounds);
 
     // save any game elements before freeing
+
     free(game);
 }
 
 void runGame(void) {
-    game_t *game = newGame(NULL, 0);  // use default path
+    game_t* game = newGame(NULL, 0);  // use default path
 
     // ugly code for clarity
     while (game->exit == false) {
         handleGame(game);
 
         drawMap(game);
-        drawGamePath(game);
         drawStats(game);
         drawTowers(game);
         drawBloons(game);
