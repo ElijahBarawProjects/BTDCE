@@ -4,7 +4,7 @@
 
 NAME = BTDCE
 ICON = icon.png
-DESCRIPTION = "Bloons TD 6 remake for the TI-84 Plus CE."
+DESCRIPTION = "Bloons TD remake for the TI-84 Plus CE."
 COMPRESSED = YES
 ARCHIVED = YES
 

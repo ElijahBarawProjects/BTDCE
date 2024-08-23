@@ -26,7 +26,6 @@
 #include "path.h"
 #include "structs.h"
 #include "utils.h"
-#include "queue.h"
 
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
@@ -112,7 +111,7 @@ void handleKeys(game_t* game) {
     if (kb_Data[6] & kb_Clear) game->exit = true;
 }
 
-void drawCursor(game_t *game) {
+void drawCursor(game_t* game) {
     int x = game->cursor.x;
     int y = game->cursor.y;
     gfx_TransparentSprite(dart1, x, y);
@@ -139,19 +138,19 @@ void drawStats(game_t* game) {
     size_t y_off = 10;
     const size_t number_width = gfx_GetStringWidth("xxx");
 
-    const char *hearts_msg = "Hearts: ";
+    const char* hearts_msg = "Hearts: ";
     gfx_PrintStringXY(hearts_msg, x_off, y_off);
     x_off += gfx_GetStringWidth(hearts_msg);
     gfx_PrintInt(game->hearts, 1);
     x_off += number_width + PADDING;
 
-    const char *round_msg = "Round: ";
+    const char* round_msg = "Round: ";
     gfx_PrintStringXY(round_msg, x_off, y_off);
     x_off += gfx_GetStringWidth(round_msg);
     gfx_PrintInt(game->round, 1);
     x_off += number_width + PADDING;
 
-    const char *coinsMsg = "Coins: ";
+    const char* coinsMsg = "Coins: ";
     gfx_PrintStringXY(coinsMsg, x_off, y_off);
     x_off += gfx_GetStringWidth(coinsMsg);
     gfx_PrintInt(game->coins, 1);
