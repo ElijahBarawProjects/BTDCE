@@ -34,10 +34,11 @@ tower_t* initTower(game_t* game) {
     // in the future, add type of monkey being initialized
     tower_t* tower = safe_malloc(sizeof(tower_t), __LINE__);
 
+    tower->cooldown = 10;
     tower->position = game->cursor;
-    tower->attack_speed = 1;
     tower->target = FIRST;
     tower->radius = 20;
+    tower->pierce = 1;
     return tower;
 }
 
@@ -48,7 +49,24 @@ bloon_t* initBloon(game_t* game) {
     bloon->position.y = ((game->path)->points)[0].y;
     bloon->speed = 3;
     bloon->segment = 0;
+    bloon->progress_along_segment = 0;
+    bloon->sprite = base;
     return bloon;
+}
+
+projectile_t* initProjectile(game_t* game, tower_t* tower) {
+    projectile_t* projectile = safe_malloc(sizeof(projectile_t), __LINE__);
+
+    // origin of the projectile (starting tower)
+    projectile->position.x = tower->position.x;
+    projectile->position.y = tower->position.y;
+
+    // TODO: case on tower to determine projectile details
+    projectile->speed = 1;
+    projectile->pierce = tower->pierce;
+    projectile->sprite = big_dart;
+    projectile->angle = 90;
+    return projectile;
 }
 
 void handleKeys(game_t* game) {
@@ -106,7 +124,7 @@ void drawCursor(game_t* game) {
 void drawMap(game_t* game) {
     // draw the background
     gfx_SetColor(158);
-    gfx_FillRectangle(0, 0, 320, 240);
+    gfx_FillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     // draw the path
     drawGamePath(game);
@@ -172,7 +190,16 @@ void drawBloons(game_t* game) {
     }
 }
 
-void drawProjectiles(game_t* game) {}
+void drawProjectiles(game_t* game) {
+    list_ele_t* curr_elem = game->projectiles->head;
+    while (curr_elem != NULL) {
+        projectile_t* projectile = (projectile_t*)(curr_elem->value);
+        gfx_TransparentSprite(
+            projectile->sprite, projectile->position.x,
+            projectile->position.y - (projectile->sprite->height / 2));
+        curr_elem = curr_elem->next;
+    }
+}
 
 void drawExitScreen(game_t* game) {
     // draw the amount of bloons that got through
@@ -330,14 +357,93 @@ game_t* newGame(position_t* points, size_t num_points) {
     return game;
 }
 
+bool boxesCollide(position_t p1, int width1, int height1, position_t p2,
+                  int width2, int height2) {
+    return (p1.x < p2.x + width2 && p1.x + width1 > p2.x &&
+            p1.y < p2.y + height2 && p1.y + height1 > p2.y);
+}
+
 void updateBloons(game_t* game) {
-    list_ele_t* curr_elem = game->bloons->head;
-    list_ele_t* tmp = NULL;
+    list_ele_t* next_bloon_elem = NULL;
+    list_ele_t* next_proj_elem = NULL;
 
     const int BLOON_VALUE = 1;
     const int num_points = game->path->num_points;
     const int num_segments = num_points - 1;
 
+    // TODO: check for collissions with projectiles
+    list_ele_t* curr_elem = game->bloons->head;
+    while (curr_elem != NULL) {
+        next_bloon_elem = curr_elem->next;
+
+        // loop over all projectiles
+
+        bloon_t* tmp_bloon = (bloon_t*)(curr_elem->value);
+        int bloon_width = tmp_bloon->sprite->width;
+        int bloon_height = tmp_bloon->sprite->height;
+        // int x = tmp_bloon->position.x;
+        // int y = tmp_bloon->position.y;
+
+        list_ele_t* curr_proj_elem = game->projectiles->head;
+        while (curr_proj_elem != NULL) {
+            next_proj_elem = curr_proj_elem->next;
+
+            projectile_t* tmp_projectile = (projectile_t*)curr_proj_elem->value;
+
+            int width = tmp_projectile->sprite->width;
+            int height = tmp_projectile->sprite->height;
+
+            // check for collision (axis aligned bounding box)
+            if (boxesCollide(tmp_bloon->position, bloon_width, bloon_height,
+                             tmp_projectile->position, width, height)) {
+                // TODO: draw the explosion/pop
+                dbg_printf(
+                    "bloon width: %d; bloon height: %d; projectile width: %d; "
+                    "projectile height: %d\n",
+                    bloon_width, bloon_height, width, height);
+
+                // remove bloon
+                remove_and_delete(game->bloons, curr_elem, free);
+
+                // remove projectile
+                remove_and_delete(game->projectiles, curr_proj_elem, free);
+
+                break;  // can't pop same bloon twice.
+            }
+
+            // // Projectile's position
+            // int px = tmp_projectile->position.x;
+            // int py = tmp_projectile->position.y;
+            // // Check for collision (axis-aligned bounding box collision
+            // // detection)
+            // if (px < x + bloon_width &&  // Check if projectile's left edge
+            // is
+            //                              // to the left of bloon's right edge
+            //     px + width > x &&  // Check if projectile's right edge is to
+            //     the
+            //                        // right of bloon's left edge
+            //     py < y + bloon_height &&  // Check if projectile's top edge
+            //     is
+            //                               // above bloon's bottom edge
+            //     py + height > y) {  // Check if projectile's bottom edge is
+            //                         // below bloon's top edge
+            //     // draw the explosion/pop
+
+            //     // remove bloon
+            //     remove_and_delete(game->bloons, curr_elem, free);
+
+            //     // remove projectile
+            //     remove_and_delete(game->projectiles, curr_proj_elem, free);
+            // }
+
+            curr_proj_elem = next_proj_elem;
+        }
+
+        curr_elem = next_bloon_elem;
+    }
+
+    curr_elem = game->bloons->head;
+    list_ele_t* tmp;
     while (curr_elem != NULL) {
         bloon_t* curr_bloon = (bloon_t*)(curr_elem->value);
         int segBeforeMove = curr_bloon->segment;
@@ -355,6 +461,47 @@ void updateBloons(game_t* game) {
         }
 
         curr_elem = curr_elem->next;
+    }
+}
+
+void updateTowers(game_t* game) {
+    list_ele_t* curr_elem = game->towers->head;
+    while (curr_elem != NULL) {
+        tower_t* tower = (tower_t*)(curr_elem->value);
+        if ((++tower->tick) % tower->cooldown == 0) {
+            // tower can attack; it spawns a new projectile
+            queue_insert_head(game->projectiles, initProjectile(game, tower));
+        }
+        curr_elem = curr_elem->next;
+    }
+}
+
+bool offScreen(position_t p) {
+    return (p.x < 0 || p.y < 0 || p.x > SCREEN_WIDTH || p.y > SCREEN_HEIGHT);
+}
+
+void updateProjectiles(game_t* game) {
+    list_ele_t* curr_elem = game->projectiles->head;
+    list_ele_t* tmp;
+    while (curr_elem != NULL) {
+        projectile_t* proj = (projectile_t*)(curr_elem->value);
+        tmp = curr_elem->next;
+
+        // Find the vector to increase position by given angle and speed
+        // Default movement for now (moving left)
+        dbg_printf("1");
+        proj->position.x--;
+
+        // DESPAWN IF:
+        // check if projectile hsa gon off screen
+        dbg_printf("2");
+        if (offScreen(proj->position)) {
+            dbg_printf("3");
+            // Remove the projectile from the linked list & free it
+            remove_and_delete(game->projectiles, curr_elem, free);
+            dbg_printf("4");
+        }
+        curr_elem = tmp;
     }
 }
 
@@ -381,6 +528,8 @@ void handleGame(game_t* game) {
 
     // move bloons, remove any that go off screen by reducing game health by 1
     updateBloons(game);
+    updateTowers(game);
+    updateProjectiles(game);
 }
 
 void exitGame(game_t* game) {

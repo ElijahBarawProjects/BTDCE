@@ -52,15 +52,23 @@ typedef struct bloon_t {
 
 typedef struct {
     position_t position;
-    int attack_speed;
+    int cooldown;
+    int angle;
+    int tick;
+    int pop_count;
+    int pierce;
     enum { FIRST, LAST, STRONG, CLOSE } target;
     int radius;
 } tower_t;
 
 typedef struct {
     position_t position;
+    gfx_sprite_t* sprite;
     int speed;
+    int angle;
     int pierce;
+    // need the vector (speed + direction)
+    int direction;
 } projectile_t;
 
 typedef struct {
