@@ -81,12 +81,25 @@ typedef struct {
 } round_t;
 
 typedef struct {
+    size_t width;               // width of space in terms of `box_size`
+    size_t height;              // height of the space in terms of `box_size`
+    size_t box_size;            // size of the squares we break the space into
+    size_t num_boxes_in_range;  // width * height
+    queue_t** boxes;            // boxes which collectively contain all inserted
+    size_t n;                   // length of boxes
+    size_t total_size;          // number of elements across all boxes
+    queue_t* inited_boxes;  // since boxes are lazily calculated, this contains
+                            // only the ones which have been actually inited;
+                            // contains a pointer to box (which is a list)
+} multi_list_t;
+
+typedef struct {
     path_t* path;
     int hearts;
     int coins;
     queue_t* towers;
-    queue_t* bloons;
-    queue_t* projectiles;
+    multi_list_t* bloons;
+    multi_list_t* projectiles;
     round_t* rounds;
     bool exit;
     enum { SELECTED, INFO, NONE } cursor_type;

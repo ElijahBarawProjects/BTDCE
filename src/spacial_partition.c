@@ -1,86 +1,128 @@
 #include "spacial_partition.h"
 
-#include <math.h>
+#include <debug.h>
 #include <stdlib.h>
 
 #include "list.h"
 #include "structs.h"
 
-struct multi_list_t {
-    size_t width;     // width of space in terms of `box_size`
-    size_t height;    // height of the space in terms of `box_size`
-    size_t box_size;  // size of the squares we break the space into
-    size_t num_boxes;
-    queue_t **boxes;
-};
+size_t ceil_st(size_t a, size_t b) { return (a + b - 1) / b; }
 
-size_t ceil(size_t a, size_t b) { return (a + b - 1) / b; }
+static inline size_t sp_box_index(multi_list_t *l, position_t p) {
+    // find which box the position is in
+    int box_col = p.x / l->box_size;
+    int box_row = p.y / l->box_size;
+
+
+    if ((0 <= box_row && box_row < l->height) &&
+        (0 <= box_col && box_col < l->width)) {
+        // in bounds
+        return (box_col * l->width) + box_row;
+    }
+
+    // out of bounds
+    return l->num_boxes_in_range;
+}
 
 multi_list_t *new_partitioned_list(size_t width, size_t height,
                                    size_t box_size) {
-    multi_list_t *multi_l = malloc(sizeof(multi_l));
+    multi_list_t *multi_l = malloc(sizeof(multi_list_t));
+    multi_l->total_size = 0UL;
     multi_l->box_size = box_size;
-    multi_l->height = ceil(height, box_size);
-    multi_l->width = ceil(width, box_size);
-    multi_l->boxes =
-        calloc(sizeof(queue_t *),
-               multi_l->num_boxes = (multi_l->height * multi_l->width));
+    multi_l->height = ceil_st(height, box_size);
+    multi_l->width = ceil_st(width, box_size);
+
+    // list of all inited boxes
+    multi_l->inited_boxes = queue_new();
+
+    // array of (lazily created) boxes for O(1) position => box lookup
+    multi_l->num_boxes_in_range = (multi_l->height * multi_l->width);
+
+    // create an additional box for out-of-range positions
+    multi_l->n = multi_l->num_boxes_in_range + 1;
+    multi_l->boxes = calloc(sizeof(queue_t *), multi_l->n);
 
     return multi_l;
 }
 
 void free_partitioned_list(multi_list_t *free_me, void (*freer)(void *)) {
+    // free boxes
     queue_t *curr_q;
-    for (size_t i = 0; i < free_me->num_boxes; i++) {
-        if ((curr_q = (&(free_me->boxes)[i])) == NULL) continue;
-
-        queue_free(curr_q, freer);
+    for (size_t i = 0; i < free_me->n; i++) {
+        if ((curr_q = (free_me->boxes)[i]) != NULL) queue_free(curr_q, freer);
     }
+
+    // free array
+    free(free_me->boxes);
+
+    // free inited_boxes (list of boxes)
+    queue_free(free_me->inited_boxes, NULL);
 
     free(free_me);
 }
 
-queue_t *hard_get_list(multi_list_t *l, position_t p) {
-    // find which box the position is in
-    int box_col = p.x / l->box_size;
-    int box_row = p.y / l->box_size;
-    int box_ind = (box_col * l->width) + box_row;
-
-    if (box_ind >= l->num_boxes) return NULL;
+queue_t *sp_hard_get_list(multi_list_t *l, position_t p) {
+    size_t box_ind = sp_box_index(l, p);
 
     // lazily create boxes
     queue_t *box = l->boxes[box_ind];
     if (box == NULL) {
         box = queue_new();
         l->boxes[box_ind] = box;
+        queue_insert_head(l->inited_boxes, box);
     }
 
     return box;
 }
 
-queue_t *soft_get_list(multi_list_t *l, position_t p) {
-    // find which box the position is in
-    int box_col = p.x / l->box_size;
-    int box_row = p.y / l->box_size;
-    int box_ind = (box_col * l->width) + box_row;
-
-    if (box_ind >= l->num_boxes) return NULL;
-
-    return l->boxes[box_ind];
+queue_t *sp_soft_get_list(multi_list_t *l, position_t p) {
+    return l->boxes[sp_box_index(l, p)];
 }
 
-void insert(multi_list_t *l, position_t p, void *v) {
-    queue_insert_head(hard_get_list(l, p), v);
+// to see if insertion was successful, check if total size changed
+void sp_insert(multi_list_t *l, position_t p, void *v) {
+    queue_t *box = sp_hard_get_list(l, p);
+    queue_insert_head(box, v);
+    l->total_size++;
 }
 
-void remove(multi_list_t *l, position_t p, list_ele_t *elem,
-            void (*freer)(void *)) {
-    remove_and_delete(hard_get_list(l, p), elem, freer);
+void sp_remove(multi_list_t *l, position_t p, list_ele_t *elem,
+               void (*freer)(void *)) {
+    // NO-OP if list doesn't exist yet
+    queue_t *box = sp_soft_get_list(l, p);
+    if (box == NULL) return;
+
+    size_t old_box_size = queue_size(box);
+    remove_and_delete(box, elem, freer);
+    l->total_size = (l->total_size - old_box_size + queue_size(box));
 }
 
-void fix_list(multi_list_t *l, list_ele_t *elem, position_t old_pos,
-              position_t new_pos) {
+void sp_fix(multi_list_t *l, list_ele_t *elem, position_t old_pos,
+            position_t new_pos) {
+    queue_t *old_box = sp_soft_get_list(l, old_pos);
+    queue_t *new_box = sp_soft_get_list(l, new_pos);
+
+    // no need to do anything, since it will be in the same box
+    if (old_box != NULL && old_box == new_box) return;
+
     void *v = elem->value;
-    insert(l, new_pos, v);
-    remove(l, old_pos, elem, NULL);
+    sp_insert(l, new_pos, v);
+    sp_remove(l, old_pos, elem, NULL);
 }
+
+void sp_fix_box(multi_list_t *l, queue_t *old_box, list_ele_t *elem,
+                position_t new_pos) {
+    queue_t *new_box = sp_soft_get_list(l, new_pos);
+
+    // no need to do anything, since it will be in the same box
+    if (old_box != NULL && old_box == new_box) return;
+
+    void *v = elem->value;
+    sp_insert(l, new_pos, v);
+
+    size_t old_box_size = queue_size(old_box);
+    remove_and_delete(old_box, elem, NULL);
+    l->total_size = (l->total_size - old_box_size + queue_size(old_box));
+}
+
+size_t sp_total_size(multi_list_t *l) { return l->total_size; }
