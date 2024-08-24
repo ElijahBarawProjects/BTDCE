@@ -17,7 +17,7 @@ static inline size_t sp_box_index(multi_list_t *l, position_t p) {
     if ((0 <= box_row && box_row < l->height) &&
         (0 <= box_col && box_col < l->width)) {
         // in bounds
-        return (box_col * l->width) + box_row;
+        return (box_row * l->width) + box_col;
     }
 
     // out of bounds

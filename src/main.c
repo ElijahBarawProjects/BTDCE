@@ -355,9 +355,9 @@ game_t* newGame(position_t* points, size_t num_points) {
 
     game->towers = queue_new();
     game->bloons = new_partitioned_list(
-        SCREEN_HEIGHT, SCREEN_WIDTH,
+        SCREEN_WIDTH, SCREEN_HEIGHT,
         20);  // break screen into 20 x 20 boxes for spatial partitioning
-    game->projectiles = new_partitioned_list(SCREEN_HEIGHT, SCREEN_WIDTH, 20);
+    game->projectiles = new_partitioned_list(SCREEN_WIDTH, SCREEN_HEIGHT, 20);
 
     dbg_printf("created mutli_l with inited length %zu and %zu\n",
                game->bloons->inited_boxes->size,

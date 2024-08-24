@@ -55,8 +55,6 @@ void remove_and_delete(queue_t *q, list_ele_t *elem, void (*freer)(void *));
 /* Return number of elements in queue. */
 size_t queue_size(queue_t *q);
 
-// void dbg_print_queue(queue_t *q);
-
 #ifdef __cplusplus
 }
 #endif

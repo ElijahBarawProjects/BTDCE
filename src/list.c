@@ -35,11 +35,6 @@ size_t queue_size(queue_t *q) {
     return q->size;
 }
 
-// void dbg_print_queue(queue_t *q) {
-//     dbg_printf("queue {head: %p, tail: %p, size: %zu}\n", q->head, q->tail,
-//                q->size);
-// }
-
 // to check if insert is successful, check that size changed
 void queue_insert_head(queue_t *q, void *v) {
     if (q == NULL) return;
