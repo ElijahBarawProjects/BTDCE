@@ -434,70 +434,132 @@ void checkBloonProjCollissions(game_t* game) {
 
     list_ele_t* curr_bloon_box = game->bloons->inited_boxes->head;
     while (curr_bloon_box != NULL) {
+        // check all bloons in each bloon box
+
         list_ele_t* curr_bloon_elem = ((queue_t*)(curr_bloon_box->value))->head;
+        if (curr_bloon_elem == NULL) {
+            curr_bloon_box = curr_bloon_box->next;
+            continue;
+        }  // no bloons in this box
+
+        // all projectiles in same spatial box
+        queue_t* same_box_projs = sp_soft_get_list(
+            game->projectiles, ((bloon_t*)(curr_bloon_elem->value))->position);
+        if (same_box_projs == NULL) {
+            curr_bloon_box = curr_bloon_box->next;
+            continue;
+        }  // no projectiles in same box
+
         while (curr_bloon_elem != NULL) {
             next_bloon_elem = curr_bloon_elem->next;
 
             bloon_t* tmp_bloon = (bloon_t*)(curr_bloon_elem->value);
             int bloon_width = tmp_bloon->sprite->width;
             int bloon_height = tmp_bloon->sprite->height;
-            bool bloon_popped = false;
 
-            list_ele_t* curr_proj_box = game->projectiles->inited_boxes->head;
-            while (curr_proj_box != NULL) {
-                if (bloon_popped) break;
-                // loop over all projectiles
-                list_ele_t* curr_proj_elem =
-                    ((queue_t*)(curr_proj_box->value))->head;
-                while (curr_proj_elem != NULL) {
-                    next_proj_elem = curr_proj_elem->next;
+            // check all remaining projectiles in the projectile box
+            list_ele_t* curr_proj_elem = same_box_projs->head;
+            while (curr_proj_elem != NULL) {
+                next_proj_elem = curr_proj_elem->next;
 
-                    projectile_t* tmp_projectile =
-                        (projectile_t*)curr_proj_elem->value;
+                projectile_t* tmp_projectile =
+                    (projectile_t*)curr_proj_elem->value;
 
-                    int width = tmp_projectile->sprite->width;
-                    int height = tmp_projectile->sprite->height;
+                int width = tmp_projectile->sprite->width;
+                int height = tmp_projectile->sprite->height;
 
-                    // check for collision (axis aligned bounding box)
-                    if (boxesCollide(tmp_bloon->position, bloon_width,
-                                     bloon_height, tmp_projectile->position,
-                                     width, height)) {
-                        // TODO: draw the explosion/pop
-                        dbg_printf(
-                            "bloon width: %d; bloon height: %d; projectile "
-                            "width: "
-                            "%d; "
-                            "projectile height: %d\n",
-                            bloon_width, bloon_height, width, height);
+                // check for collision (axis aligned bounding box)
+                if (boxesCollide(tmp_bloon->position, bloon_width, bloon_height,
+                                 tmp_projectile->position, width, height)) {
+                    // TODO: draw the explosion/pop
 
-                        dbg_printf(
-                            "bloon x: %d; bloon y: %d; proj x: %d; proj y: "
-                            "%d\n",
-                            tmp_bloon->position.x, tmp_bloon->position.y,
-                            tmp_projectile->position.x,
-                            tmp_projectile->position.y);
+                    // remove bloon
+                    sp_remove(game->bloons, tmp_bloon->position,
+                              curr_bloon_elem, free);
+                    // remove_and_delete(game->bloons, curr_bloon_elem,
+                    // free);
 
-                        // remove bloon
-                        sp_remove(game->bloons, tmp_bloon->position,
-                                  curr_bloon_elem, free);
-                        // remove_and_delete(game->bloons, curr_bloon_elem,
-                        // free);
+                    // remove projectile
+                    sp_remove(game->projectiles, tmp_projectile->position,
+                              curr_proj_elem, free);
 
-                        // remove projectile
-                        sp_remove(game->projectiles, tmp_projectile->position,
-                                  curr_proj_elem, free);
-                        // remove_and_delete(game->projectiles, curr_proj_elem,
-                        // free);
-                        bloon_popped = true;
-                        break;  // can't pop same bloon twice.
-                    }
-
-                    curr_proj_elem = next_proj_elem;
+                    break;  // can't pop same bloon twice.
                 }
-                curr_proj_box = curr_proj_box->next;
+                curr_proj_elem = next_proj_elem;
             }
+
             curr_bloon_elem = next_bloon_elem;
         }
+
+        // while (curr_bloon_elem != NULL) {
+        //     next_bloon_elem = curr_bloon_elem->next;
+
+        //     bloon_t* tmp_bloon = (bloon_t*)(curr_bloon_elem->value);
+        //     int bloon_width = tmp_bloon->sprite->width;
+        //     int bloon_height = tmp_bloon->sprite->height;
+        //     bool bloon_popped = false;
+
+        //     list_ele_t* curr_proj_box =
+        //     game->projectiles->inited_boxes->head; while (curr_proj_box
+        //     != NULL) {
+        //         if (bloon_popped) break;
+        //         // loop over all projectiles
+        //         list_ele_t* curr_proj_elem =
+        //             ((queue_t*)(curr_proj_box->value))->head;
+        //         while (curr_proj_elem != NULL) {
+        //             next_proj_elem = curr_proj_elem->next;
+
+        //             projectile_t* tmp_projectile =
+        //                 (projectile_t*)curr_proj_elem->value;
+
+        //             int width = tmp_projectile->sprite->width;
+        //             int height = tmp_projectile->sprite->height;
+
+        //             // check for collision (axis aligned bounding box)
+        //             if (boxesCollide(tmp_bloon->position, bloon_width,
+        //                              bloon_height,
+        //                              tmp_projectile->position, width,
+        //                              height)) {
+        //                 // TODO: draw the explosion/pop
+        //                 dbg_printf(
+        //                     "bloon width: %d; bloon height: %d;
+        //                     projectile " "width: "
+        //                     "%d; "
+        //                     "projectile height: %d\n",
+        //                     bloon_width, bloon_height, width, height);
+
+        //                 dbg_printf(
+        //                     "bloon x: %d; bloon y: %d; proj x: %d; proj
+        //                     y: "
+        //                     "%d\n",
+        //                     tmp_bloon->position.x, tmp_bloon->position.y,
+        //                     tmp_projectile->position.x,
+        //                     tmp_projectile->position.y);
+
+        //                 // remove bloon
+        //                 sp_remove(game->bloons, tmp_bloon->position,
+        //                           curr_bloon_elem, free);
+        //                 // remove_and_delete(game->bloons,
+        //                 curr_bloon_elem,
+        //                 // free);
+
+        //                 // remove projectile
+        //                 sp_remove(game->projectiles,
+        //                 tmp_projectile->position,
+        //                           curr_proj_elem, free);
+        //                 // remove_and_delete(game->projectiles,
+        //                 curr_proj_elem,
+        //                 // free);
+        //                 bloon_popped = true;
+        //                 break;  // can't pop same bloon twice.
+        //             }
+
+        //             curr_proj_elem = next_proj_elem;
+        //         }
+        //         curr_proj_box = curr_proj_box->next;
+        //     }
+        //     curr_bloon_elem = next_bloon_elem;
+        // }
         curr_bloon_box = curr_bloon_box->next;
     }
 }
@@ -526,8 +588,8 @@ void updateBloons(game_t* game) {
                 tmp = curr_elem->next;
 
                 sp_remove(game->bloons, pos_before_move, curr_elem, free);
-                // remove_and_delete(game->bloons, curr_elem, free);  // frees
-                // list_elem_t and bloon_t
+                // remove_and_delete(game->bloons, curr_elem, free);  //
+                // frees list_elem_t and bloon_t
                 curr_elem = tmp;
                 continue;
             }
@@ -650,8 +712,6 @@ void handleGame(game_t* game) {
         // queue_insert_head(game->bloons, initBloon(game));
         game->rounds[game->round].num_bloons += 1;
     }
-
-    updateTowers(game);
 
     // move all projectiles, removing any that go off screen
     updateProjectiles(game);
